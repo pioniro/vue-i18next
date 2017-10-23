@@ -5,7 +5,9 @@ import component from './component';
 export let Vue;
 
 export function install(_Vue) {
-  if (install.installed) { return; }
+  if (install.installed) {
+    return;
+  }
   install.installed = true;
 
   Vue = _Vue;
@@ -22,11 +24,14 @@ export function install(_Vue) {
       $t() {
         const getKey = getByKey(this._i18nOptions, this.$i18n.i18next.options);
 
-        if (this._i18nOptions && this._i18nOptions.namespaces) {
-          const { lng, namespaces } = this._i18nOptions;
+        if (this._i18nOptions && this._i18nOptions.namespacesToLoad) {
+          const { lng, namespacesToLoad } = this._i18nOptions;
+          const fixedT = this.$i18n.i18next.getFixedT(lng, namespacesToLoad);
 
-          const fixedT = this.$i18n.i18next.getFixedT(lng, namespaces);
-          return (key, options) => fixedT(getKey(key), options, this.$i18n.i18nLoadedAt);
+          return (key, options) => {
+            console.log(lng, namespacesToLoad);
+            return fixedT(getKey(key), options, this.$i18n.i18nLoadedAt);
+          };
         }
 
         return (key, options) =>
@@ -41,48 +46,86 @@ export function install(_Vue) {
       } else if (options.parent && options.parent.$i18n) {
         this.$i18n = options.parent.$i18n;
       }
-      let inlineTranslations = {};
 
       if (this.$i18n) {
-        const namespace = options.name || `${Math.random()}`;
-        let namespacesToLoad = [namespace];
+        const defaultNS = this.$i18n.i18next.options.defaultNS;
+        const parentOptions =
+          options.parent && options.parent._i18nOptions ? options.parent._i18nOptions : null;
 
+        let inlineTranslations = {};
         if (options.__i18n) {
           options.__i18n.forEach((resource) => {
             inlineTranslations = deepmerge(inlineTranslations, JSON.parse(resource));
           });
         }
 
-        if (this.$options.i18nOptions) {
-          const { lng = null, keyPrefix = null, messages } = this.$options.i18nOptions;
-          let { namespaces } = this.$options.i18nOptions;
-          namespaces = namespaces || this.$i18n.i18next.options.defaultNS;
+        const namespace = options.name || options._componentTag || `${Math.random()}`;
+        let parentsNamespaces = [];
+        if (parentOptions && parentOptions.namespace) {
+          parentsNamespaces = [parentOptions.namespace, ...(parentOptions.parentsNamespaces || [])];
+        }
 
+        if (options.i18nOptions) {
+          let namespacesToLoad = [];
+          const { keyPrefix = null, messages } = options.i18nOptions;
+          let { namespaces, lng = null } = options.i18nOptions;
           if (typeof namespaces === 'string') namespaces = [namespaces];
-          namespacesToLoad = namespaces.concat(namespacesToLoad);
+
+          if (!namespaces) {
+            if (parentOptions && parentOptions.namespaces) {
+              namespaces = parentOptions.namespaces;
+              namespacesToLoad = [
+                ...new Set([...parentOptions.namespaces, namespace, ...parentsNamespaces]),
+              ];
+            } else {
+              namespacesToLoad = [...defaultNS, namespace, ...parentsNamespaces];
+            }
+          } else {
+            namespacesToLoad = [...namespaces, namespace, ...parentsNamespaces];
+          }
+
+          if (!lng && parentOptions && parentOptions.lng) {
+            lng = parentOptions.lng;
+          }
 
           if (messages) {
             inlineTranslations = deepmerge(inlineTranslations, messages);
           }
 
-          this._i18nOptions = { lng, namespaces: namespacesToLoad, keyPrefix };
-        } else if (options.parent && options.parent._i18nOptions) {
-          this._i18nOptions = options.parent._i18nOptions;
+          this._i18nOptions = {
+            lng,
+            namespace,
+            namespaces,
+            namespacesToLoad,
+            parentsNamespaces,
+            keyPrefix,
+          };
+          this.$i18n.i18next.loadNamespaces(namespacesToLoad);
+        } else if (parentOptions) {
+          this._i18nOptions = { ...parentOptions, namespace, parentsNamespaces };
+          this._i18nOptions.namespacesToLoad = [
+            ...(parentOptions.namespaces || defaultNS),
+            namespace,
+            ...parentsNamespaces,
+          ];
+          this.$i18n.i18next.loadNamespaces(namespace);
         } else if (options.__i18n) {
-          this._i18nOptions = { namespaces: namespacesToLoad };
+          this._i18nOptions = { namespace, parentsNamespaces };
+          this._i18nOptions.namespacesToLoad = [...defaultNS, namespace, ...parentsNamespaces];
+          this.$i18n.i18next.loadNamespaces([...defaultNS, namespace]);
         }
 
+        // TODO: do it only once per component namespace
         const languages = Object.keys(inlineTranslations);
         languages.forEach((lang) => {
           this.$i18n.i18next.addResourceBundle(
-          lang,
-          namespace,
-          { ...inlineTranslations[lang] },
-          true,
-          false);
+            lang,
+            namespace,
+            { ...inlineTranslations[lang] },
+            true,
+            false,
+          );
         });
-
-        this.$i18n.i18next.loadNamespaces(Array.from(new Set(namespacesToLoad)));
       }
     },
   });

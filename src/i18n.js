@@ -1,14 +1,16 @@
 import { install, Vue } from './install';
 
 export default class VueI18n {
-  constructor(i18next, options = { }) {
+  constructor(i18next, options = {}) {
     const { bindI18n = 'languageChanged loaded', bindStore = 'added removed' } = options;
 
     this._vm = null;
     this.i18next = i18next;
     this.onI18nChanged = this.onI18nChanged.bind(this);
 
-    if (bindI18n) { this.i18next.on(bindI18n, this.onI18nChanged); }
+    if (bindI18n) {
+      this.i18next.on(bindI18n, this.onI18nChanged);
+    }
     if (bindStore && this.i18next.store) {
       this.i18next.store.on(bindStore, this.onI18nChanged);
     }
