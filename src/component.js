@@ -29,6 +29,8 @@ export default {
         if (match.length === 0) return memo;
 
         child = match;
+      } else if (!children) {
+        return memo;
       } else {
         const place = match.trim();
         if (isNaN(parseFloat(place)) || !isFinite(place)) {
