@@ -1,5 +1,5 @@
 {
-  "name": "@panter/vue-i18next",
+  "name": "pioniro/vue-i18next",
   "description": "i18next wrapper for vue",
   "version": "0.4.0-development",
   "author": "Claudio Romano <cro@panter.ch>",
